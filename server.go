@@ -57,7 +57,7 @@ func (server *Server) Handler(conn net.Conn) {
 		select {
 			case <-isLive:
 				// Do nothing to reset timer
-			case <-time.After(10 * time.Second):
+			case <-time.After(5 * 60 * time.Second):
 				// Force offline current user
 				user.SendMessage("You are offline due to timeout")
 				time.Sleep(1 * time.Second)
@@ -88,11 +88,11 @@ func (server *Server) Brodcast(user *User, msg string) {
 
 func (server *Server) ListOnlineUsers() []User {
 	var onlineUsers []User
-	server.mapLock.Lock()
+	server.mapLock.RLock()
 	for _, user := range server.OnlineMap {
 		onlineUsers = append(onlineUsers, *user)
 	}
-	server.mapLock.Unlock()
+	server.mapLock.RUnlock()
 	return onlineUsers
 }
 

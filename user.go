@@ -65,7 +65,9 @@ func (user *User) DoMessage(msg string, server *Server) {
 		case strings.Contains(msg, "/rename"):
 			newName := strings.Split(msg, " ")[1]
 			// Check if username has been taken
+			server.mapLock.RLock()
 			_, ok := server.OnlineMap[newName]
+			server.mapLock.RUnlock()
 			if (ok) {
 				user.SendMessage("This username has been taken by someone!")
 			} else {
@@ -77,7 +79,27 @@ func (user *User) DoMessage(msg string, server *Server) {
 				user.Name = newName
 				user.SendMessage("Your new username is: " + user.Name)
 			}
-			
+		case strings.Contains(msg, "/to"):
+			parts := strings.Split(msg, " ")
+			if len(parts) < 3 {
+				user.SendMessage("Invalid command format. Use /to <username> <message>")
+				return
+			}
+			targetUserName := parts[1]
+			msg := strings.Join(parts[2:], " ")
+
+			server.mapLock.RLock()
+			targetUser, ok := server.OnlineMap[targetUserName]
+			server.mapLock.RUnlock()
+
+			if !ok {
+				user.SendMessage("User not found: " + targetUserName)
+				return
+			}
+
+			// Send the message to the target user
+			targetUser.SendMessage(user.Name + ": " + msg)
+
 		default: server.Brodcast(user, msg)
 	}
 }
