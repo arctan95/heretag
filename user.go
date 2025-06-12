@@ -1,6 +1,9 @@
 package main
 
-import "net"
+import (
+	"net"
+	"strings"
+)
 
 type User struct {
 	Name string
@@ -23,6 +26,40 @@ func NewUser(conn net.Conn) *User {
 	go user.ListenForMessage()
 	
 	return user
+}
+
+func (user *User) Online(server *Server) {
+	// Add current user to onlineMap
+	server.mapLock.Lock()
+	server.OnlineMap[user.Name] = user
+	server.mapLock.Unlock()
+	// Brodcast user online Message
+	server.Brodcast(user, "online")
+}
+
+func (user *User) Offline(server *Server) {
+	// Remove current user from onlineMap
+	server.mapLock.Lock()
+	delete(server.OnlineMap, user.Name)
+	server.mapLock.Unlock()
+	// Brodcast user offline Message
+	server.Brodcast(user, "offline")
+}
+
+func (user *User) SendMessage(msg string, server *Server) {
+	switch msg {
+		case "/list":
+			onlineUsers := server.ListOnlineUsers()
+			var builder strings.Builder
+			for i, user := range onlineUsers {
+				builder.WriteString(user.Name)
+				if i < len(onlineUsers)-1 {
+					builder.WriteString("\n")
+				}
+			} 
+			user.C <- builder.String()
+		default: server.Brodcast(user, msg)
+	}
 }
 
 // lisen current user's channel

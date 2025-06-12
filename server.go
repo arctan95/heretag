@@ -27,26 +27,16 @@ func NewServer(ip string, port int) *Server {
 	return server
 }
 
-func (server *Server) Handler(conn net.Conn) {
-	
+func (server *Server) Handler(conn net.Conn) {	
 	user := NewUser(conn)
-	
-	// Add current user to onlineMap
-	server.mapLock.Lock()
-	server.OnlineMap[user.Name] = user
-	server.mapLock.Unlock()
-	
-	// Brodcast user online Message
-	server.Brodcast(user, "online")
-
-
+	user.Online(server)
 	go func() {
 		buf := make([]byte, 4096)
 		for {
 			n, err := conn.Read(buf)
 
 			if n == 0 {
-				server.Brodcast(user, "offline")
+				user.Offline(server)
 				return
 			}
 			if err != nil && err != io.EOF{
@@ -56,7 +46,7 @@ func (server *Server) Handler(conn net.Conn) {
 
 			// Read message from user
 			msg := string(buf[:n-1])
-			server.Brodcast(user, msg)
+			user.SendMessage(msg, server)
 		}
 	}()
 
@@ -78,6 +68,16 @@ func (server *Server) ListenServerMessgae() {
 func (server *Server) Brodcast(user *User, msg string) {
 	sendMsg := "[" + user.Addr + "]" + user.Name + ":" + msg
 	server.Message <- sendMsg
+}
+
+func (server *Server) ListOnlineUsers() []User {
+	var onlineUsers []User
+	server.mapLock.Lock()
+	for _, user := range server.OnlineMap {
+		onlineUsers = append(onlineUsers, *user)
+	}
+	server.mapLock.Unlock()
+	return onlineUsers
 }
 
 // Start server
