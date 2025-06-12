@@ -46,7 +46,7 @@ func (server *Server) Handler(conn net.Conn) {
 
 			// Read message from user
 			msg := string(buf[:n-1])
-			user.SendMessage(msg, server)
+			user.DoMessage(msg, server)
 		}
 	}()
 

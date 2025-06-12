@@ -46,9 +46,13 @@ func (user *User) Offline(server *Server) {
 	server.Brodcast(user, "offline")
 }
 
-func (user *User) SendMessage(msg string, server *Server) {
-	switch msg {
-		case "/list":
+func (user *User) SendMessage(msg string) {
+	user.C <- msg
+}
+
+func (user *User) DoMessage(msg string, server *Server) {
+	switch {
+		case msg == "/list":
 			onlineUsers := server.ListOnlineUsers()
 			var builder strings.Builder
 			for i, user := range onlineUsers {
@@ -57,7 +61,23 @@ func (user *User) SendMessage(msg string, server *Server) {
 					builder.WriteString("\n")
 				}
 			} 
-			user.C <- builder.String()
+			user.SendMessage(builder.String())
+		case strings.Contains(msg, "/rename"):
+			newName := strings.Split(msg, " ")[1]
+			// Check if username has been taken
+			_, ok := server.OnlineMap[newName]
+			if (ok) {
+				user.SendMessage("This username has been taken by someone!")
+			} else {
+				server.mapLock.Lock()
+				delete(server.OnlineMap, user.Name)
+				server.OnlineMap[newName] = user
+				server.mapLock.Unlock()
+				
+				user.Name = newName
+				user.SendMessage("Your new username is: " + user.Name)
+			}
+			
 		default: server.Brodcast(user, msg)
 	}
 }
