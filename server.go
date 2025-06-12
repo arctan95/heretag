@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -23,22 +24,21 @@ func NewServer(ip string, port int) *Server {
 		OnlineMap: make(map[string]*User),
 		Message: make(chan string),
 	}
-	fmt.Printf("Server listening at %s:%d\n", ip, port)
+	fmt.Printf("Server listening at: %s:%d\n", ip, port)
 	return server
 }
 
 func (server *Server) Handler(conn net.Conn) {	
 	user := NewUser(conn)
 	user.Online(server)
+	
+	isLive := make(chan bool)
+	
 	go func() {
 		buf := make([]byte, 4096)
 		for {
 			n, err := conn.Read(buf)
 
-			if n == 0 {
-				user.Offline(server)
-				return
-			}
 			if err != nil && err != io.EOF{
 				fmt.Println("Conn read err:", err)
 				return
@@ -46,11 +46,27 @@ func (server *Server) Handler(conn net.Conn) {
 
 			// Read message from user
 			msg := string(buf[:n-1])
-			user.DoMessage(msg, server)
+			if msg != "" {
+				user.DoMessage(msg, server)
+			}
+			isLive <- true
 		}
 	}()
 
-	select {}
+	for {
+		select {
+			case <-isLive:
+				// Do nothing to reset timer
+			case <-time.After(10 * time.Second):
+				// Force offline current user
+				user.SendMessage("You are offline due to timeout")
+				time.Sleep(1 * time.Second)
+				user.Offline(server)
+				close(user.C)
+				user.conn.Close()
+				return
+		}
+	}
 }
 
 func (server *Server) ListenServerMessgae() {
